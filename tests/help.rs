@@ -1,11 +1,11 @@
 use std::process::Command;
 
-use anyhow::Error;
+use anyhow::{Context, Error};
 use assert_cmd::prelude::*;
 
 #[test]
 fn prints_help() -> Result<(), Error> {
-    let mut command = Command::cargo_bin("github-dev-app")?;
+    let mut command = Command::cargo_bin("github-dev-app").context("failed to find the binary")?;
 
     command.arg("--help");
 
