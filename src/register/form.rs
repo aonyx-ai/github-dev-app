@@ -1,6 +1,6 @@
 //! The form for starting the registration process
 
-use askama_axum::Template;
+use askama::Template;
 use url::Url;
 
 use crate::manifest::SerializedManifest;

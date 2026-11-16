@@ -4,8 +4,10 @@ use std::net::SocketAddr;
 use std::path::Path;
 
 use anyhow::{Context, Error};
+use askama::Template;
 use axum::extract::{Query, State};
-use axum::response::IntoResponse;
+use axum::http::StatusCode;
+use axum::response::{Html, IntoResponse};
 use axum::routing::get;
 use axum::Router;
 use serde::Deserialize;
@@ -118,7 +120,10 @@ async fn run_axum_server(
 /// This function renders the form that is used to start the registration process for a new GitHub
 /// App. The form includes the manifest that was generated from the manifest file.
 async fn show_form(state: State<AppState>) -> impl IntoResponse {
-    Form::new(state.github.clone(), state.manifest.clone())
+    match Form::new(state.github.clone(), state.manifest.clone()).render() {
+        Ok(html) => Html(html).into_response(),
+        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    }
 }
 
 /// Handle the callback after registering a new GitHub App
