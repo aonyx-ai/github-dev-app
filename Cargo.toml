@@ -9,7 +9,7 @@ license = "MIT OR Apache-2.0"
 
 [dependencies]
 anyhow = "1.0.86"
-askama = "0.12.1"
+askama = "0.16.0"
 async-trait = "0.1.80"
 axum = "0.8.0"
 clap = { version = "4.5.7", features = ["derive"] }
