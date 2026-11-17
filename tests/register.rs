@@ -1,7 +1,7 @@
 use std::process::Command;
 use std::time::Duration;
 
-use anyhow::Error;
+use anyhow::{ensure, Context, Error};
 use assert_cmd::prelude::*;
 use indoc::indoc;
 use mockito::Server;
@@ -13,19 +13,24 @@ use tokio::time::sleep;
 
 const TEMPORARY_CODE: &str = "otters-are-the-cutest";
 
+/// Registers an app against a mocked GitHub API and checks the `.env` file
+///
+/// The test runs the command in a temporary directory with a temporary manifest file. It mocks
+/// GitHub's API, waits for the server to launch, and sends the temporary code. Then it checks that
+/// the mock was called, that the command succeeded, and that the `.env` file holds the expected
+/// values.
 #[tokio::test]
 async fn saves_private_key_and_secrets() -> Result<(), Error> {
-    let mut command = Command::cargo_bin("github-dev-app")?;
+    let mut command = Command::cargo_bin("github-dev-app").context("failed to find the binary")?;
 
-    // Execute command in temporary directory
-    let temp_dir = tempdir()?;
+    let temp_dir = tempdir().context("failed to create the temporary directory")?;
     command.current_dir(temp_dir.path());
 
-    // Create a temporary manifest file
-    let manifest = NamedTempFile::new_in(temp_dir.path())?;
-    std::fs::write(manifest.path(), r#"{"url":"http://localhost"}"#)?;
+    let manifest = NamedTempFile::new_in(temp_dir.path())
+        .context("failed to create the temporary manifest file")?;
+    std::fs::write(manifest.path(), r#"{"url":"http://localhost"}"#)
+        .context("failed to write the temporary manifest file")?;
 
-    // Mock GitHub's API
     let mut server = Server::new_async().await;
     let server_url = server.url();
     let mock = server
@@ -45,7 +50,6 @@ async fn saves_private_key_and_secrets() -> Result<(), Error> {
         "#})
         .create();
 
-    // Execute the register command
     let mut process_handle = command
         .arg("register")
         .arg(manifest.path())
@@ -56,7 +60,6 @@ async fn saves_private_key_and_secrets() -> Result<(), Error> {
         .spawn()
         .expect("failed to execute command");
 
-    // Wait for server to launch
     for _ in 0..10 {
         if is_port_reachable("localhost:64001") {
             break;
@@ -65,7 +68,6 @@ async fn saves_private_key_and_secrets() -> Result<(), Error> {
         }
     }
 
-    // Send temporary code
     Client::new()
         .get("http://localhost:64001/callback?code=otters-are-the-cutest")
         .send()
@@ -74,14 +76,12 @@ async fn saves_private_key_and_secrets() -> Result<(), Error> {
 
     let exit_status = process_handle.wait().expect("failed to wait for command");
 
-    // Assert that the mock was called
     mock.assert();
 
-    // Assert that the command was successful
-    assert!(exit_status.success());
+    ensure!(exit_status.success(), "the command failed: {exit_status}");
 
-    // Assert that the .env file contains the expected values
-    let env = std::fs::read_to_string(temp_dir.path().join(".env"))?;
+    let env = std::fs::read_to_string(temp_dir.path().join(".env"))
+        .context("failed to read the .env file")?;
     assert_eq!(
         indoc! {r#"
         GITHUB_APP_ID=1

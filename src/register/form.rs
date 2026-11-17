@@ -20,9 +20,11 @@ pub struct Form {
     manifest: SerializedManifest,
 }
 
+#[bon::bon]
 impl Form {
-    /// Create a new instance of the form
-    pub fn new(github: Url, manifest: SerializedManifest) -> Self {
+    /// Creates a new instance of the form
+    #[builder]
+    pub(crate) fn new(github: Url, manifest: SerializedManifest) -> Self {
         let base_url = if github.domain() == Some("api.github.com") {
             Url::parse("https://github.com").expect("failed to parse hard-coded URL")
         } else {
@@ -37,5 +39,17 @@ impl Form {
             form_endpoint,
             manifest,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn assert_auto_traits<T: Send + Sync + Unpin>() {}
+
+    #[test]
+    fn form_is_send_sync_and_unpin() {
+        assert_auto_traits::<Form>();
     }
 }

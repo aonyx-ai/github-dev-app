@@ -5,8 +5,7 @@ use std::net::SocketAddr;
 
 use anyhow::{Context, Error};
 use async_trait::async_trait;
-use reqwest::Client;
-use url::Url;
+use reqwest::{Client, Url};
 
 use crate::cli::Args;
 use crate::Execute;
@@ -28,19 +27,20 @@ pub struct RegisterCommand<'a> {
 }
 
 impl<'a> RegisterCommand<'a> {
-    /// Create a new instance of the command
-    pub fn new(args: &'a RegisterArgs) -> Self {
+    /// Creates a new instance of the command
+    pub(crate) fn new(args: &'a RegisterArgs) -> Self {
         Self { args }
     }
 
-    /// Open the form that starts the registration process
+    /// Opens the form that starts the registration process
     ///
     /// This method opens the form that starts the registration process in the user's default web
     /// browser. The form sends the manifest to register a new GitHub App, allowing the user to
     /// customize the name. After the user registers the app, they will be redirected back to the
     /// local web server to complete the registration process.
+    ///
+    /// The method skips opening the browser if it runs in CI.
     fn open_registration_form(&self, addr: &SocketAddr) -> Result<(), Error> {
-        // Skip opening the browser if running in CI
         if var("CI").is_ok() {
             return Ok(());
         }
@@ -49,12 +49,13 @@ impl<'a> RegisterCommand<'a> {
             .context("failed to open browser to start registration process")
     }
 
-    /// Open the page to install the app
+    /// Opens the page to install the app
     ///
     /// After a new app has been registered, the user can install it in their GitHub account. This
     /// method opens the GitHub settings to install the app.
+    ///
+    /// The method skips opening the browser if it runs in CI.
     fn open_installation_page(&self, app: &App) -> Result<(), Error> {
-        // Skip opening the browser if running in CI
         if var("CI").is_ok() {
             return Ok(());
         }
@@ -69,43 +70,51 @@ impl<'a> RegisterCommand<'a> {
 
 #[async_trait]
 impl<'a> Execute for RegisterCommand<'a> {
+    /// Registers a new GitHub App
+    ///
+    /// The method opens a browser to start the registration process. It waits for the user to be
+    /// redirected back to the local server with a temporary code. It exchanges the temporary code
+    /// for the app secrets and saves the secrets and the private key to the .env file. Last, it
+    /// opens the page to install the app.
     async fn execute(&self, _global_args: &Args) -> Result<(), Error> {
         let (addr, mut receiver) = start_background_web_server(
             self.args.manifest(),
             self.args.github().clone(),
             self.args.port(),
         )
-        .await?;
+        .await
+        .context("failed to start the web server")?;
 
-        // Open a browser to start the registration process
-        self.open_registration_form(&addr)?;
+        self.open_registration_form(&addr)
+            .context("failed to start the registration process")?;
 
-        // Wait for the user to be redirected back to the local server with a temporary code
         let temporary_code = receiver
             .recv()
             .await
             .context("failed to receive temporary code from internal channel")?;
 
-        // Exchange the temporary code for the app secrets
-        let app = exchange_temporary_code(self.args.github(), &temporary_code).await?;
+        let app = exchange_temporary_code(self.args.github(), &temporary_code)
+            .await
+            .context("failed to exchange the temporary code for the app secrets")?;
 
-        // Save secrets and private key to the .env file
-        save_to_env(&app)?;
+        save_to_env(&app).context("failed to save the app secrets to the .env file")?;
 
-        // Open the page to install the app
-        self.open_installation_page(&app)?;
+        self.open_installation_page(&app)
+            .context("failed to open the installation page")?;
 
         Ok(())
     }
 }
 
-/// Exchange a temporary code for the app secrets
+/// Exchanges a temporary code for the app secrets
 ///
 /// This function exchanges a temporary code for the app secrets. The temporary code is provided by
 /// GitHub after the user registers the app. The function sends the temporary code to GitHub and
 /// receives the app's id, secrets, and private key in return.
 async fn exchange_temporary_code(github: &Url, code: &str) -> Result<App, Error> {
-    let url = github.join(&format!("app-manifests/{code}/conversions"))?;
+    let url = github
+        .join(&format!("app-manifests/{code}/conversions"))
+        .context("failed to build the conversion URL")?;
 
     let response = Client::new()
         .post(url)
@@ -117,7 +126,10 @@ async fn exchange_temporary_code(github: &Url, code: &str) -> Result<App, Error>
     if !response.status().is_success() {
         return Err(anyhow::anyhow!(
             "failed to convert temporary code with error {}",
-            response.text().await?
+            response
+                .text()
+                .await
+                .context("failed to read the conversion error")?
         ));
     }
 

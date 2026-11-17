@@ -28,7 +28,7 @@ name!(SerializedManifest);
 ///
 /// The manifest has to be provided by the user. To make customization easier, some fields in the
 /// manifest can be overwritten using command-line arguments when registering the app.
-#[derive(Clone, Eq, PartialEq, Debug, Getters, Setters, Deserialize, Serialize, TypedBuilder)]
+#[derive(Clone, Eq, PartialEq, Debug, Deserialize, Getters, Serialize, Setters, TypedBuilder)]
 pub struct Manifest {
     /// The name of the GitHub App
     #[builder(default, setter(strip_option))]
@@ -114,7 +114,7 @@ pub struct Manifest {
 ///
 /// The webhook configuration specifies the URL of the server that will receive the webhook `POST`
 /// requests and whether the webhook is active.
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Getters, Deserialize, Serialize)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Deserialize, Getters, Serialize)]
 pub struct HookAttributes {
     /// The URL of the server that will receive the webhook `POST` requests
     #[getset(get = "pub")]
@@ -127,21 +127,21 @@ pub struct HookAttributes {
 }
 
 impl Manifest {
-    /// Initialize a manifest from a file
+    /// Initializes a manifest from a file
     ///
     /// This method initializes a manifest from a file. The file is expected to contain a JSON
     /// object that will get deserialized into a manifest.
-    pub fn from_file(path: &Path) -> Result<Self, Error> {
+    pub(crate) fn from_file(path: &Path) -> Result<Self, Error> {
         let source = std::fs::read_to_string(path).context("failed to read manifest file")?;
 
         Self::from_str(&source)
     }
 
-    /// Initialize a manifest from a string
+    /// Initializes a manifest from a string
     ///
     /// This method initializes a manifest from a string. The string is expected to be a JSON object
     /// that will get deserialized into a manifest.
-    pub fn from_str(source: &str) -> Result<Self, Error> {
+    pub(crate) fn from_str(source: &str) -> Result<Self, Error> {
         serde_json::from_str(source).context("failed to deserialize manifest")
     }
 }
@@ -231,6 +231,12 @@ mod tests {
         let error = Manifest::from_str(json).unwrap_err();
 
         assert!(format!("{:?}", error).contains("missing field `url`"));
+    }
+
+    #[test]
+    fn hook_attributes_is_send_sync_and_unpin() {
+        fn assert_auto_traits<T: Send + Sync + Unpin>() {}
+        assert_auto_traits::<HookAttributes>();
     }
 
     #[test]

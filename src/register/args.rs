@@ -13,7 +13,7 @@ use url::Url;
 /// requires the path to the manifest file as an argument, and optionally accepts other arguments to
 /// customize the manifest.
 #[derive(
-    Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Parser, CopyGetters, Getters, TypedBuilder,
+    Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, CopyGetters, Getters, Parser, TypedBuilder,
 )]
 pub struct RegisterArgs {
     /// The path to the manifest file
@@ -33,4 +33,16 @@ pub struct RegisterArgs {
     #[builder(setter(into))]
     #[getset(get_copy = "pub")]
     port: Option<u16>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn assert_auto_traits<T: Send + Sync + Unpin>() {}
+
+    #[test]
+    fn register_args_is_send_sync_and_unpin() {
+        assert_auto_traits::<RegisterArgs>();
+    }
 }

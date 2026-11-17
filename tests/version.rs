@@ -1,12 +1,12 @@
 use std::process::Command;
 
-use anyhow::Error;
+use anyhow::{Context, Error};
 use assert_cmd::prelude::*;
 
 #[test]
 fn prints_version() -> Result<(), Error> {
     let expected_output = format!("github-dev-app {}\n", env!("CARGO_PKG_VERSION"));
-    let mut command = Command::cargo_bin("github-dev-app")?;
+    let mut command = Command::cargo_bin("github-dev-app").context("failed to find the binary")?;
 
     command.arg("--version");
 

@@ -12,9 +12,9 @@ use crate::register::RegisterArgs;
 /// Create and manage a GitHub App for local development
 ///
 /// This command-line tool can be used to create and manage a GitHub App for local development. It
-/// provides a simple way to register a new GitHub App from a manifest, add the app's secrets to the
-/// .env file, and update the app when the manifest changes.
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Parser, Getters)]
+/// registers a new GitHub App from a manifest. It adds the app's secrets to the .env file. It also
+/// updates the app when the manifest changes.
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Getters, Parser)]
 #[command(version, about)]
 pub struct Args {
     /// The command to execute
@@ -36,6 +36,13 @@ pub enum Command {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn assert_auto_traits<T: Send + Sync + Unpin>() {}
+
+    #[test]
+    fn command_is_send_sync_and_unpin() {
+        assert_auto_traits::<Command>();
+    }
 
     #[test]
     fn trait_send() {

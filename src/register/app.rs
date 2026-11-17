@@ -17,9 +17,9 @@ secret!(PrivateKey);
 ///
 /// This struct represents a GitHub App's secrets and private key. The secrets are used to
 /// authenticate the app with GitHub and the private key is used to sign requests.
-#[derive(Clone, Debug, Deserialize, CopyGetters, Getters)]
+#[derive(Clone, Debug, CopyGetters, Deserialize, Getters)]
 #[cfg_attr(test, derive(TypedBuilder))]
-#[allow(unused)] // TODO Remove when the secrets are saved locally
+#[allow(unused, reason = "remove when the secrets are saved locally")]
 pub struct App {
     /// The unique identifier for the app
     #[cfg_attr(test, builder(setter(into)))]
